@@ -1,105 +1,75 @@
 import { useState } from "react";
-import type { SavingsGoal } from "../types";
+import { createGoal } from "../services/api";
 
 type GoalFormProps = {
-  onAddGoal: (goal: SavingsGoal) => void;
+  refreshGoals: () => void;
 };
 
-function GoalForm({ onAddGoal }: GoalFormProps) {
-  // These states store what the user types into the form
+function GoalForm({ refreshGoals }: GoalFormProps) {
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
   const [savedAmount, setSavedAmount] = useState("");
   const [category, setCategory] = useState("");
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    // This prevents the page from refreshing when the form is submitted
-    event.preventDefault();
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
 
-    // Convert the amount values from text to numbers
-    const target = Number(targetAmount);
-    const saved = Number(savedAmount);
-
-    // Simple validation to make sure the user fills important fields
-    if (!name || !targetAmount || !savedAmount || !category) {
-      alert("Please fill in all fields.");
-      return;
-    }
-
-    if (target <= 0) {
-      alert("Target amount must be greater than zero.");
-      return;
-    }
-
-    if (saved < 0) {
-      alert("Saved amount cannot be negative.");
-      return;
-    }
-
-    // Create a new goal object
-    const newGoal: SavingsGoal = {
-      id: Date.now(),
+    const newGoal = {
       name,
-      targetAmount: target,
-      savedAmount: saved,
+      targetAmount: Number(targetAmount),
+      savedAmount: Number(savedAmount),
       category,
     };
 
-    // Send the new goal to App.tsx
-    onAddGoal(newGoal);
+    try {
+      // Send the goal to Express backend
+      await createGoal(newGoal);
 
-    // Clear the form after submission
-    setName("");
-    setTargetAmount("");
-    setSavedAmount("");
-    setCategory("");
+      // Refresh the goals list after saving
+      refreshGoals();
+
+      // Clear form
+      setName("");
+      setTargetAmount("");
+      setSavedAmount("");
+      setCategory("");
+    } catch (error) {
+      console.error(error);
+      alert("Unable to save goal.");
+    }
   }
 
   return (
     <form className="goal-form" onSubmit={handleSubmit}>
-      <h2>Create a Savings Goal</h2>
+      <h2>Create Savings Goal</h2>
 
-      <label>
-        Goal Name
-        <input
-          type="text"
-          placeholder="Example: Laptop Fund"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
+      <input
+        placeholder="Goal Name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
 
-      <label>
-        Target Amount
-        <input
-          type="number"
-          placeholder="Example: 500000"
-          value={targetAmount}
-          onChange={(event) => setTargetAmount(event.target.value)}
-        />
-      </label>
+      <input
+        type="number"
+        placeholder="Target Amount"
+        value={targetAmount}
+        onChange={(e) => setTargetAmount(e.target.value)}
+      />
 
-      <label>
-        Saved Amount
-        <input
-          type="number"
-          placeholder="Example: 150000"
-          value={savedAmount}
-          onChange={(event) => setSavedAmount(event.target.value)}
-        />
-      </label>
+      <input
+        type="number"
+        placeholder="Saved Amount"
+        value={savedAmount}
+        onChange={(e) => setSavedAmount(e.target.value)}
+      />
 
-      <label>
-        Category
-        <input
-          type="text"
-          placeholder="Example: Education"
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-        />
-      </label>
+      <input
+        placeholder="Category"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+      />
 
-      <button type="submit">Add Goal</button>
+      <button>Add Goal</button>
     </form>
   );
 }
