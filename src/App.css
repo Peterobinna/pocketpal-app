@@ -114,3 +114,96 @@ body {
   height: 100%;
   background-color: #0f766e;
 }
+
+.loading-text {
+  text-align: center;
+  font-weight: 700;
+}
+
+.transaction-form {
+  background-color: white;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  margin: 32px 0;
+}
+
+.transaction-form h2 {
+  margin-top: 0;
+  color: #0f766e;
+}
+
+.transaction-form label {
+  display: block;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.transaction-form input,
+.transaction-form select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.transaction-form button {
+  width: 100%;
+  padding: 14px;
+  background-color: #0f766e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transaction-form button:hover {
+  background-color: #115e59;
+}
+
+.transactions-section {
+  margin-top: 32px;
+}
+
+.transaction-list {
+  display: grid;
+  gap: 14px;
+}
+
+.transaction-card {
+  background-color: white;
+  padding: 18px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.transaction-card h3 {
+  margin: 0 0 8px;
+  color: #1f2933;
+}
+
+.transaction-card p {
+  margin: 4px 0;
+}
+
+.transaction-amount {
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.transaction-amount.income {
+  color: #15803d;
+}
+
+.transaction-amount.expense {
+  color: #b91c1c;
+}
