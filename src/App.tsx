@@ -4,76 +4,98 @@ import "./App.css";
 
 import GoalForm from "./components/GoalForm";
 import GoalCard from "./components/GoalCard";
+import TransactionForm from "./components/TransactionForm";
+import TransactionList from "./components/TransactionList";
 
-import { getGoals } from "./services/api";
+import { getGoals, getTransactions } from "./services/api";
+
+import type { SavingsGoal } from "./types";
+import type { Transaction } from "./types/transaction";
 
 function App() {
+  // Stores all savings goals from the backend.
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
 
-  // Stores all savings goals
-  const [goals, setGoals] = useState<any[]>([]);
+  // Stores all transactions from the backend.
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // Stores loading state so the user knows data is being fetched.
+  const [loading, setLoading] = useState(true);
 
   /**
-   * Loads all goals from backend
+   * Load savings goals from Express backend.
    */
   async function loadGoals() {
     try {
-
       const response = await getGoals();
-
-      // Express returns:
-      // {
-      //   message: "...",
-      //   data: [...]
-      // }
-
       setGoals(response.data);
-
     } catch (error) {
-
-      console.error(error);
-
+      console.error("Error loading goals:", error);
     }
   }
 
   /**
-   * Runs once when page loads
+   * Load transactions from Express backend.
+   */
+  async function loadTransactions() {
+    try {
+      const response = await getTransactions();
+      setTransactions(response.data);
+    } catch (error) {
+      console.error("Error loading transactions:", error);
+    }
+  }
+
+  /**
+   * Load all app data when the page first opens.
    */
   useEffect(() => {
-    loadGoals();
+    async function loadAppData() {
+      setLoading(true);
+
+      await loadGoals();
+      await loadTransactions();
+
+      setLoading(false);
+    }
+
+    loadAppData();
   }, []);
 
   return (
     <main className="app">
-
       <section className="hero">
         <h1>PocketPal</h1>
-
         <p>
           A simple savings and budget tracker for African university students.
         </p>
       </section>
 
-      <GoalForm refreshGoals={loadGoals} />
+      {loading ? (
+        <p className="loading-text">Loading PocketPal data...</p>
+      ) : (
+        <>
+          <GoalForm refreshGoals={loadGoals} />
 
-      <section className="goals-section">
+          <section className="goals-section">
+            <h2>Your Savings Goals</h2>
 
-        <h2>Your Savings Goals</h2>
+            {goals.length === 0 ? (
+              <p>No savings goals yet. Create your first goal above.</p>
+            ) : (
+              <div className="goals-grid">
+                {goals.map((goal) => (
+                  <GoalCard key={goal.id} goal={goal} />
+                ))}
+              </div>
+            )}
+          </section>
 
-        <div className="goals-grid">
+          <TransactionForm refreshTransactions={loadTransactions} />
 
-          {goals.map((goal) => (
-
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-            />
-
-          ))}
-
-        </div>
-
-      </section>
-
+          <TransactionList transactions={transactions} />
+        </>
+      )}
     </main>
   );
 }
