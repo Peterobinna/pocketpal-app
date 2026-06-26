@@ -1,6 +1,9 @@
+
 import express from "express";
 import cors from "cors";
 import goalsRouter from "./routes/goals.js";
+import transactionsRouter from "./routes/transactions.js";
+
 
 // Create the Express app
 const app = express();
@@ -40,7 +43,7 @@ app.get("/", (req, res) => {
  * POST /api/goals
  */
 app.use("/api/goals", goalsRouter);
-
+app.use("/api/transactions", transactionsRouter);
 // Start the backend server
 app.listen(PORT, () => {
   console.log(`PocketPal backend is running on http://localhost:${PORT}`);
