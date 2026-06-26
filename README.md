@@ -12,6 +12,23 @@ The application allows users to create savings goals, monitor their savings prog
 
 ---
 
+# Team Members
+
+| Team Member   | Role                                   |
+| ------------- | -------------------------------------- |
+| Peter Nnamchukwu | Team Lead / Repository & Documentation |
+| Olivier Ishimwe | Frontend Developer                     |
+| Sarah Kasande | Backend Developer                      |
+| Sibahle Dlamini | DevOps & QA                            |
+
+## Team Tracker Sheet 
+
+[BSE Team Task Sheet - Advanced DevOps](https://docs.google.com/spreadsheets/d/1Zg4m-Mq2uBONXfw4mRRhndXJrH9SZFlJd-Z36j7nMSE/edit?usp=sharing)
+
+
+
+---
+
 # Problem Statement
 
 Many university students struggle to manage their finances effectively. Weekly allowances, mobile money transactions, irregular income, and daily expenses make it difficult to save consistently and monitor spending.
@@ -194,13 +211,13 @@ Example:
 Clone the repository.
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Peterobinna/pocketpal-app.git
 ```
 
 Move into the project.
 
 ```bash
-cd pocketpal
+cd pocketpal-app
 ```
 
 Install dependencies.
@@ -337,18 +354,6 @@ The current version of PocketPal supports:
 - Express REST API
 - GitHub collaboration workflow
 
----
-
-# Team Members
-
-| Team Member   | Role                                   |
-| ------------- | -------------------------------------- |
-| Team Member 1 | Team Lead / Repository & Documentation |
-| Team Member 2 | Frontend Developer                     |
-| Team Member 3 | Backend Developer                      |
-| Team Member 4 | DevOps & QA                            |
-
-Replace the names above with your actual team members.
 
 ---
 
