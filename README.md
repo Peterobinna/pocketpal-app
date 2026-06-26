@@ -368,6 +368,31 @@ Future versions of PocketPal may include:
 - Terraform infrastructure
 
 ---
+## DevOps Evidence
+
+The team used GitHub Projects to plan and manage development work using a Kanban workflow.
+
+The board includes:
+
+- Backlog
+- In Progress
+- Done
+
+The team also used labels to organise work by category:
+
+- frontend
+- backend
+- devops
+- documentation
+- security
+- testing
+- feature
+
+The `main` branch is protected using branch protection rules. Pull requests are required before merging, at least one approval is required, conversations must be resolved, and branches must be up to date before merge.
+
+This supports secure collaboration and helps prevent accidental direct changes to the main branch.
+
+---
 
 # License
 
