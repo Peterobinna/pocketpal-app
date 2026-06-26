@@ -1,7 +1,7 @@
 import express from "express";
 import { transactions } from "../data/transactions.js";
 
-// Create a router
+// Create a router for the pocketpal-app
 const router = express.Router();
 
 /*
