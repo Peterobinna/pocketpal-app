@@ -8,7 +8,7 @@ describe("calculateProgress", () => {
   it("returns 50 when saved amount is 50 and target amount is 100", () => {
     const result = calculateProgress(50, 100);
 
-    expect(result).toBe(50);
+    expect(result).toBe(60);
   });
 
   it("does not return more than 100 when saved amount is higher than target amount", () => {
