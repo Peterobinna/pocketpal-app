@@ -1,0 +1,68 @@
+# PocketPal Continuous Integration Pipeline
+# This workflow checks code quality, runs tests, and builds Docker images.
+
+name: PocketPal CI
+
+on:
+  # Run CI when code is pushed to any branch except main
+  push:
+    branches-ignore:
+      - main
+
+  # Run CI when a pull request is opened against main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci-checks:
+    name: Lint, Test, and Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download repository code into the GitHub Actions runner
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Node.js for frontend and backend tasks
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Step 3: Install frontend dependencies
+      - name: Install frontend dependencies
+        run: npm install
+
+      # Step 4: Run frontend linting
+      # If linting fails, the pipeline fails.
+      - name: Run frontend lint
+        run: npm run lint
+
+      # Step 5: Run frontend tests
+      # If tests fail, the pipeline fails.
+      - name: Run frontend tests
+        run: npm test
+
+      # Step 6: Install backend dependencies
+      - name: Install backend dependencies
+        working-directory: ./server
+        run: npm install
+
+      # Step 7: Run backend tests
+      # If backend tests fail, the pipeline fails.
+      - name: Run backend tests
+        working-directory: ./server
+        run: npm test
+
+      # Step 8: Build backend Docker image
+      # If Docker build fails, the pipeline fails.
+      - name: Build backend Docker image
+        run: docker build --target backend-run -t pocketpal-backend .
+
+      # Step 9: Build frontend Docker image
+      # If Docker build fails, the pipe
+      # This is step 9
+      
+      - name: Build frontend Docker image
+        run: docker build --target frontend-run -t pocketpal-frontend .
