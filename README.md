@@ -14,18 +14,16 @@ The application allows users to create savings goals, monitor their savings prog
 
 # Team Members
 
-| Team Member   | Role                                   |
-| ------------- | -------------------------------------- |
+| Team Member      | Role                                   |
+| ---------------- | -------------------------------------- |
 | Peter Nnamchukwu | Team Lead / Repository & Documentation |
-| Olivier Ishimwe | Frontend Developer                     |
-| Sarah Kasande | Backend Developer                      |
-| Sibahle Dlamini | DevOps & QA                            |
+| Olivier Ishimwe  | Frontend Developer                     |
+| Sarah Kasande    | Backend Developer                      |
+| Sibahle Dlamini  | DevOps & QA                            |
 
-## Team Tracker Sheet 
+## Team Tracker Sheet
 
 [BSE Team Task Sheet - Advanced DevOps](https://docs.google.com/spreadsheets/d/1Zg4m-Mq2uBONXfw4mRRhndXJrH9SZFlJd-Z36j7nMSE/edit?usp=sharing)
-
-
 
 ---
 
@@ -354,7 +352,6 @@ The current version of PocketPal supports:
 - Express REST API
 - GitHub collaboration workflow
 
-
 ---
 
 # Future Improvements
@@ -373,6 +370,7 @@ Future versions of PocketPal may include:
 - Terraform infrastructure
 
 ---
+
 ## DevOps Evidence
 
 The team used GitHub Projects to plan and manage development work using a Kanban workflow.
@@ -398,6 +396,74 @@ The `main` branch is protected using branch protection rules. Pull requests are 
 This supports secure collaboration and helps prevent accidental direct changes to the main branch.
 
 ---
+
+Running with Docker Compose
+
+## Running with Docker Compose
+
+PocketPal can be run locally using Docker Compose.
+
+### Build and start all services
+
+```bash
+docker compose up --build
+```
+
+The command builds the Docker images (if required) and starts both the frontend and backend containers.
+
+### Frontend
+
+```text
+http://localhost:5173
+```
+
+### Backend
+
+```text
+http://localhost:5000
+```
+
+### Stop the containers
+
+```bash
+docker compose down
+```
+
+This stops and removes all running containers created by Docker Compose.
+Continuous Integration (CI)
+
+## CI Pipeline
+
+PocketPal uses **GitHub Actions** to automatically validate every code change before it is merged into the `main` branch.
+
+The CI pipeline automatically performs the following tasks:
+
+- Installs project dependencies
+- Runs ESLint to check code quality
+- Executes frontend tests
+- Executes backend tests
+- Builds the Docker images
+
+The workflow is triggered when:
+
+- A developer pushes to any branch except `main`
+- A Pull Request is opened or updated targeting the `main` branch
+
+If any linting, test, or Docker build step fails, the entire workflow fails and the Pull Request cannot be merged until the issue is fixed.
+Docker Project Structure
+
+## Docker Files
+
+The project includes the following Docker-related files:
+
+```text
+Dockerfile
+docker-compose.yml
+.dockerignore
+.github/workflows/ci.yml
+```
+
+These files provide containerization and automated continuous integration for the application.
 
 # License
 
