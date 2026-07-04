@@ -1,11 +1,8 @@
 // This file handles communication between the frontend and backend.
 
-// The API URL comes from Vite environment variables when available.
-// If no environment variable is provided, it falls back to localhost.
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const GOALS_URL = `${API_BASE_URL}/api/goals`;
-const TRANSACTIONS_URL = `${API_BASE_URL}/api/transactions`;
+// Backend URLs
+const GOALS_URL = "http://localhost:5000/api/goals";
+const TRANSACTIONS_URL = "http://localhost:5000/api/transactions";
 
 /**
  * Fetch all savings goals from the backend.
