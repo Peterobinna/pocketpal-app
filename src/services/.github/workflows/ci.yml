@@ -61,6 +61,8 @@ jobs:
         run: docker build --target backend-run -t pocketpal-backend .
 
       # Step 9: Build frontend Docker image
-      # If Docker build fails, the pipeline fails.
+      # If Docker build fails, the pipe
+      # This is step 9
+      
       - name: Build frontend Docker image
         run: docker build --target frontend-run -t pocketpal-frontend .
