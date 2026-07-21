@@ -1,0 +1,21 @@
+---
+- name: Update apt package cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  apt:
+    name:
+      - git
+      - docker.io
+      - docker-compose-v2
+      - python3-pip
+      - python3-docker
+    state: present
+
+- name: Enable Docker service
+  service:
+    name: docker
+    enabled: true
+    state: started

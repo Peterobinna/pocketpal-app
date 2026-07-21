@@ -1,0 +1,22 @@
+---
+- name: Clone PocketPal repository
+  git:
+    repo: "https://github.com/Peterobinna/pocketpal-app.git"
+    dest: /opt/pocketpal
+    version: formative-3-integration
+    force: yes
+
+- name: Build and start PocketPal containers
+  community.docker.docker_compose_v2:
+    project_src: /opt/pocketpal
+    state: present
+    build: always
+
+- name: Verify running containers
+  become: true
+  command: docker ps
+  register: docker_ps
+
+- name: Display running containers
+  debug:
+    var: docker_ps.stdout_lines

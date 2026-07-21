@@ -1,0 +1,9 @@
+---
+- name: Configure PocketPal Server
+  hosts: web
+  become: true
+
+  roles:
+    - docker
+    - application
+    - security
