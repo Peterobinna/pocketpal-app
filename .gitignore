@@ -27,3 +27,22 @@ dist-ssr/
 *.sw?
 
 .venv/
+
+# Terraform generated and sensitive local files
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+crash.log
+crash.*.log
+
+# SSH private keys
+*.pem
+*.ppk
+
+# Terraform working directories and saved plans
+**/.terraform/
+tfplan
+*.tfplan
