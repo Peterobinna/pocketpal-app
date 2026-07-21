@@ -1,0 +1,27 @@
+---
+- name: Install UFW firewall
+  apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Allow frontend port
+  community.general.ufw:
+    rule: allow
+    port: "5173"
+    proto: tcp
+
+- name: Allow backend port
+  community.general.ufw:
+    rule: allow
+    port: "5000"
+    proto: tcp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
