@@ -51,18 +51,53 @@ jobs:
 
       # Step 7: Run backend tests
       # If backend tests fail, the pipeline fails.
+      # NOTE: requires server/vitest.config.js (added alongside this workflow fix) so
+      # Vitest doesn't inherit the root config's "exclude: server/**" and silently
+      # report "no test files found".
       - name: Run backend tests
         working-directory: ./server
         run: npm test
 
-      # Step 8: Build backend Docker image
+      # Step 8: Dependency vulnerability scan (frontend)
+      # Fails the pipeline on high or critical severity advisories.
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+
+      # Step 9: Dependency vulnerability scan (backend)
+      # Fails the pipeline on high or critical severity advisories.
+      - name: Audit backend dependencies
+        working-directory: ./server
+        run: npm audit --audit-level=high
+
+      # Step 10: Build backend Docker image
       # If Docker build fails, the pipeline fails.
       - name: Build backend Docker image
         run: docker build --target backend-run -t pocketpal-backend .
 
-      # Step 9: Build frontend Docker image
-      # If Docker build fails, the pipe
-      # This is step 9
-      
+      # Step 11: Build frontend Docker image
+      # If Docker build fails, the pipeline fails.
       - name: Build frontend Docker image
         run: docker build --target frontend-run -t pocketpal-frontend .
+
+      # Step 12: Scan built container images for known vulnerabilities
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: pocketpal-backend
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: pocketpal-frontend
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      # Step 13: Scan Terraform for misconfigurations
+      - name: Checkov scan (Terraform)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: true
