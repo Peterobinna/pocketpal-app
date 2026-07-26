@@ -1,74 +1,43 @@
-# VPC identifier used by the PocketPal infrastructure.
 output "vpc_id" {
-  description = "ID of the PocketPal VPC"
-  value       = aws_vpc.main.id
+  value = aws_vpc.main.id
 }
 
-# Public subnet identifier.
-output "public_subnet_id" {
-  description = "ID of the PocketPal public subnet"
-  value       = aws_subnet.public.id
+output "bastion_public_ip" {
+  description = "Public IP used as the Ansible jump host"
+  value       = aws_instance.bastion.public_ip
 }
 
-# Internet gateway identifier.
-output "internet_gateway_id" {
-  description = "ID of the VPC internet gateway"
-  value       = aws_internet_gateway.main.id
+output "bastion_security_group_id" {
+  description = "Used by CD for temporary GitHub runner SSH access"
+  value       = aws_security_group.bastion.id
 }
 
-# Public route-table identifier.
-output "public_route_table_id" {
-  description = "ID of the public route table"
-  value       = aws_route_table.public.id
+output "application_private_ip" {
+  description = "Private application server IP"
+  value       = aws_instance.application.private_ip
 }
 
-# Application security-group identifier.
-output "security_group_id" {
-  description = "ID of the PocketPal EC2 security group"
-  value       = aws_security_group.pocketpal.id
+output "frontend_ecr_repository_url" {
+  value = aws_ecr_repository.frontend.repository_url
 }
 
-# EC2 instance identifier.
-output "instance_id" {
-  description = "ID of the PocketPal EC2 instance"
-  value       = aws_instance.pocketpal.id
+output "backend_ecr_repository_url" {
+  value = aws_ecr_repository.backend.repository_url
 }
 
-# Public IPv4 address used to access the server.
-output "instance_public_ip" {
-  description = "Public IPv4 address of the PocketPal EC2 instance"
-  value       = aws_instance.pocketpal.public_ip
+output "database_endpoint" {
+  value     = aws_db_instance.main.endpoint
+  sensitive = true
 }
 
-# Public DNS hostname assigned to the server.
-output "instance_public_dns" {
-  description = "Public DNS name of the PocketPal EC2 instance"
-  value       = aws_instance.pocketpal.public_dns
+output "load_balancer_dns" {
+  value = aws_lb.main.dns_name
 }
 
-# Availability zone selected for the public subnet.
-output "availability_zone" {
-  description = "Availability zone containing the PocketPal server"
-  value       = aws_subnet.public.availability_zone
+output "live_application_url" {
+  value = "http://${aws_lb.main.dns_name}"
 }
 
-# Ubuntu AMI selected dynamically for the deployment.
-output "ubuntu_ami_id" {
-  description = "ID of the Ubuntu AMI selected for the EC2 instance"
-  value       = data.aws_ami.ubuntu.id
-}
-
-# Command that can be used to connect to the instance.
-output "ssh_command" {
-  description = "Example SSH command for connecting to the PocketPal server"
-  value       = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ubuntu@${aws_instance.pocketpal.public_ip}"
-}
-
-# URLs for testing the deployed containers after Ansible configuration.
-output "application_urls" {
-  description = "PocketPal application URLs after Ansible deployment"
-  value = {
-    frontend = "http://${aws_instance.pocketpal.public_ip}:${var.frontend_port}"
-    backend  = "http://${aws_instance.pocketpal.public_ip}:${var.backend_port}"
-  }
+output "health_check_url" {
+  value = "http://${aws_lb.main.dns_name}/health"
 }

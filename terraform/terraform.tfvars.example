@@ -1,30 +1,29 @@
-# Copy this file to terraform.tfvars before running Terraform.
-# Replace example values with values appropriate for your environment.
-#
-# Never place AWS access keys, secret keys or session tokens in this file.
-
 aws_region = "us-east-1"
 
 project_name = "pocketpal"
-environment  = "dev"
+environment  = "production"
 
-vpc_cidr           = "10.0.0.0/16"
-public_subnet_cidr = "10.0.1.0/24"
+vpc_cidr                  = "10.0.0.0/16"
+public_subnet_1_cidr      = "10.0.1.0/24"
+public_subnet_2_cidr      = "10.0.2.0/24"
+application_subnet_cidr   = "10.0.10.0/24"
+database_subnet_1_cidr    = "10.0.20.0/24"
+database_subnet_2_cidr    = "10.0.21.0/24"
 
-instance_type   = "t3.micro"
+instance_type    = "t3.micro"
 root_volume_size = 10
 
-# This key pair must already exist in the selected AWS region.
-ssh_key_name = "pocketpal-course-key"
-
-# Replace this documentation IP with your own public IPv4 address followed by /32.
-# Example documentation addresses should not be used for real deployments.
-ssh_allowed_cidr = "203.0.113.10/32"
+ssh_key_name     = "pocketpal-course-key"
+ssh_allowed_cidr = "YOUR_PUBLIC_IP/32"
 
 frontend_port = 5173
 backend_port  = 5000
 
+db_name     = "pocketpal"
+db_username = "pocketpal_admin"
+db_password = "REPLACE_WITH_A_STRONG_PASSWORD"
+
 additional_tags = {
-  Course     = "Formative-3"
-  Component  = "Infrastructure"
+  Course    = "Advanced-DevOps"
+  Assignment = "Summative"
 }
