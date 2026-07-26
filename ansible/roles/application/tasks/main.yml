@@ -1,22 +1,62 @@
 ---
-- name: Clone PocketPal repository
-  git:
-    repo: "https://github.com/Peterobinna/pocketpal-app.git"
-    dest: /opt/pocketpal
-    version: formative-3-integration
-    force: yes
+- name: Validate deployment variables
+  ansible.builtin.assert:
+    that:
+      - ecr_registry | length > 0
+      - image_tag | length > 0
+    fail_msg: "ecr_registry and image_tag must be supplied."
 
-- name: Build and start PocketPal containers
+- name: Create application directory
+  ansible.builtin.file:
+    path: "{{ app_directory }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0755"
+
+- name: Authenticate Docker with Amazon ECR
+  ansible.builtin.shell: |
+    aws ecr get-login-password --region {{ aws_region }} \
+    | docker login --username AWS --password-stdin {{ ecr_registry }}
+  args:
+    executable: /bin/bash
+  changed_when: false
+  no_log: true
+
+- name: Write production Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ app_directory }}/docker-compose.yml"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Pull production container images
   community.docker.docker_compose_v2:
-    project_src: /opt/pocketpal
+    project_src: "{{ app_directory }}"
+    pull: always
     state: present
-    build: always
 
-- name: Verify running containers
-  become: true
-  command: docker ps
+- name: Start PocketPal containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_directory }}"
+    state: present
+    recreate: always
+
+- name: Wait for backend health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ backend_port }}/health"
+    status_code: 200
+  register: health_result
+  retries: 10
+  delay: 5
+  until: health_result.status == 200
+
+- name: Show running containers
+  ansible.builtin.command: docker ps
   register: docker_ps
+  changed_when: false
 
 - name: Display running containers
-  debug:
+  ansible.builtin.debug:
     var: docker_ps.stdout_lines
