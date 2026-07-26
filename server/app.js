@@ -18,6 +18,18 @@ app.use(express.json());
 app.use(cors());
 
 /**
+ * Health-check endpoint used by the load balancer,
+ * deployment pipeline and operators.
+ */
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    service: "pocketpal-backend",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
  * Health route
  *
  * This route confirms that the backend is running.

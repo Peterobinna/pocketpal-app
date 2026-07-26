@@ -37,7 +37,8 @@ COPY . .
 
 # Allow frontend API URL to be passed during Docker build.
 # If no value is passed, it defaults to localhost backend.
-ARG VITE_API_URL=http://localhost:5000
+# An empty value makes the frontend call /api through the same load balancer.
+ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build the production frontend files into the dist folder.

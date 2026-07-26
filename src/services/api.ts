@@ -1,8 +1,10 @@
-// This file handles communication between the frontend and backend.
+// Use the configured URL when supplied.
+// In production, an empty value makes the browser call the same
+// Application Load Balancer that served the frontend.
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
-// Backend URLs
-const GOALS_URL = "http://localhost:5000/api/goals";
-const TRANSACTIONS_URL = "http://localhost:5000/api/transactions";
+const GOALS_URL = `${API_BASE_URL}/api/goals`;
+const TRANSACTIONS_URL = `${API_BASE_URL}/api/transactions`;
 
 /**
  * Fetch all savings goals from the backend.
@@ -18,7 +20,7 @@ export async function getGoals() {
 }
 
 /**
- * Send a new savings goal to the backend.
+ * Create a new savings goal.
  */
 export async function createGoal(goal: unknown) {
   const response = await fetch(GOALS_URL, {
@@ -37,7 +39,7 @@ export async function createGoal(goal: unknown) {
 }
 
 /**
- * Fetch all transactions from the backend.
+ * Fetch all transactions.
  */
 export async function getTransactions() {
   const response = await fetch(TRANSACTIONS_URL);
@@ -50,7 +52,7 @@ export async function getTransactions() {
 }
 
 /**
- * Send a new transaction to the backend.
+ * Create a new transaction.
  */
 export async function createTransaction(transaction: unknown) {
   const response = await fetch(TRANSACTIONS_URL, {
