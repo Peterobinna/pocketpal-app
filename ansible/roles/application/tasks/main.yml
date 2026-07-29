@@ -1,59 +1,71 @@
 ---
-- name: Validate deployment variables
+- name: Validate required deployment variables
   ansible.builtin.assert:
     that:
+      - app_name | length > 0
+      - app_directory | length > 0
+      - app_user | length > 0
+      - aws_region | length > 0
       - ecr_registry | length > 0
       - image_tag | length > 0
-    fail_msg: "ecr_registry and image_tag must be supplied."
+      - frontend_port | int > 0
+      - backend_port | int > 0
+    fail_msg: >-
+      Required deployment variables are missing or invalid.
+      The CD workflow must supply ecr_registry and image_tag.
 
 - name: Create application directory
   ansible.builtin.file:
     path: "{{ app_directory }}"
     state: directory
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
     mode: "0755"
 
 - name: Authenticate Docker with Amazon ECR
   ansible.builtin.shell: |
+    set -o pipefail
     aws ecr get-login-password --region {{ aws_region }} \
-    | docker login --username AWS --password-stdin {{ ecr_registry }}
+      | docker login \
+          --username AWS \
+          --password-stdin {{ ecr_registry }}
   args:
     executable: /bin/bash
   changed_when: false
   no_log: true
 
-- name: Write production Docker Compose file
+- name: Render production Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ app_directory }}/docker-compose.yml"
-    owner: ubuntu
-    group: ubuntu
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
     mode: "0644"
 
-- name: Pull production container images
+- name: Pull and start PocketPal containers
   community.docker.docker_compose_v2:
     project_src: "{{ app_directory }}"
     pull: always
     state: present
-
-- name: Start PocketPal containers
-  community.docker.docker_compose_v2:
-    project_src: "{{ app_directory }}"
-    state: present
-    recreate: always
+    recreate: auto
+    remove_orphans: true
 
 - name: Wait for backend health endpoint
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ backend_port }}/health"
+    method: GET
     status_code: 200
+    return_content: true
   register: health_result
-  retries: 10
+  retries: 12
   delay: 5
-  until: health_result.status == 200
+  until:
+    - health_result.status == 200
+    - health_result.json.status == "healthy"
 
-- name: Show running containers
-  ansible.builtin.command: docker ps
+- name: Show running PocketPal containers
+  ansible.builtin.command:
+    cmd: docker ps --filter name=pocketpal --format "{{ '{{' }}.Names{{ '}}' }}: {{ '{{' }}.Status{{ '}}' }}"
   register: docker_ps
   changed_when: false
 
