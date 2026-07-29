@@ -1,4 +1,6 @@
 resource "aws_lb" "main" {
+  # checkov:skip=CKV2_AWS_28:AWS WAF is outside the cost and scope of this coursework environment. A production deployment should attach a managed WAF web ACL.
+
   name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -9,6 +11,7 @@ resource "aws_lb" "main" {
     aws_subnet.public_2.id
   ]
 
+  # Reject malformed HTTP headers before they reach the application.
   drop_invalid_header_fields = true
 
   tags = {
@@ -17,6 +20,8 @@ resource "aws_lb" "main" {
 }
 
 resource "aws_lb_target_group" "frontend" {
+  # checkov:skip=CKV_AWS_378:Traffic between the ALB and application EC2 remains inside the private VPC. Production should use end-to-end TLS where required.
+
   name        = "${var.project_name}-frontend-tg"
   port        = var.frontend_port
   protocol    = "HTTP"
@@ -36,6 +41,8 @@ resource "aws_lb_target_group" "frontend" {
 }
 
 resource "aws_lb_target_group" "backend" {
+  # checkov:skip=CKV_AWS_378:Traffic between the ALB and application EC2 remains inside the private VPC. Production should use end-to-end TLS where required.
+
   name        = "${var.project_name}-backend-tg"
   port        = var.backend_port
   protocol    = "HTTP"
@@ -67,6 +74,8 @@ resource "aws_lb_target_group_attachment" "backend" {
 }
 
 resource "aws_lb_listener" "http" {
+  # checkov:skip=CKV_AWS_103:The coursework environment does not currently have a domain and ACM certificate. Production must use TLS 1.2 or newer and redirect HTTP to HTTPS.
+
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
