@@ -3,11 +3,11 @@
 # =========================================================
 #
 # Targets:
-#   frontend-run - serves the compiled React application
-#   backend-run  - runs the Express API
+#   frontend-run - serves compiled React files with Nginx
+#   backend-run  - runs the Express API with Node.js
 #
-# npm is used during image construction but removed from the
-# final runtime images to reduce vulnerabilities and attack surface.
+# The frontend runtime contains no Node.js, npm or serve package.
+# This reduces image size and removes unnecessary dependencies.
 # =========================================================
 
 
@@ -25,11 +25,11 @@ COPY package.json package-lock.json ./
 
 RUN npm ci
 
-# Copy the frontend source after installing dependencies.
+# Copy the application source after dependencies are installed.
 COPY . .
 
-# An empty API URL causes the frontend to call relative /api routes
-# through the Application Load Balancer.
+# An empty value makes the frontend call relative /api routes
+# through the AWS Application Load Balancer.
 ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 
@@ -37,36 +37,34 @@ RUN npm run build
 
 
 # =========================================================
-# STAGE 2: RUN FRONTEND
+# STAGE 2: RUN FRONTEND WITH UNPRIVILEGED NGINX
 # =========================================================
 
-FROM node:20-alpine AS frontend-run
+FROM nginxinc/nginx-unprivileged:alpine AS frontend-run
 
-WORKDIR /app
+# Temporarily become root only while applying operating-system
+# security patches and preparing configuration files.
+USER root
 
-# Install only the static-file server required at runtime.
-#
-# npm is then removed because the running frontend does not need a
-# package manager. Removing npm also removes vulnerable packages
-# bundled inside npm, including brace-expansion and node-tar.
-RUN npm install --global serve@14.2.6 \
-    && npm cache clean --force \
-    && rm -rf /root/.npm \
-    && rm -rf /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm \
-    && rm -f /usr/local/bin/npx
+# Upgrade Alpine packages to patched versions, including
+# libcrypto3 and libssl3.
+RUN apk upgrade --no-cache
 
-# Copy only the compiled Vite output.
-COPY --from=frontend-build /app/dist ./dist
+# Remove the default Nginx virtual-host configuration.
+RUN rm -f /etc/nginx/conf.d/default.conf
 
-# Ensure the compiled files can be read by the unprivileged user.
-RUN chown -R node:node /app
+# Install the PocketPal Nginx configuration.
+COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/pocketpal.conf
 
-USER node
+# Copy only compiled static frontend files.
+COPY --from=frontend-build --chown=101:101 /app/dist /usr/share/nginx/html
+
+# Return to the image's unprivileged Nginx user.
+USER 101
 
 EXPOSE 5173
 
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["nginx", "-g", "daemon off;"]
 
 
 # =========================================================
@@ -77,13 +75,15 @@ FROM node:20-alpine AS backend-run
 
 WORKDIR /app/server
 
-# Copy backend dependency manifests first.
+# Apply current Alpine security patches, including patched
+# OpenSSL packages.
+RUN apk upgrade --no-cache
+
+# Copy dependency manifests before source files.
 COPY server/package.json server/package-lock.json ./
 
-# Install production dependencies only.
-#
-# npm is removed after installation because the backend starts
-# directly with Node and does not require npm at runtime.
+# Install production dependencies only. npm is removed afterward
+# because the backend starts directly with Node.js.
 RUN npm ci --omit=dev \
     && npm cache clean --force \
     && rm -rf /root/.npm \
@@ -91,7 +91,6 @@ RUN npm ci --omit=dev \
     && rm -f /usr/local/bin/npm \
     && rm -f /usr/local/bin/npx
 
-# Copy the backend source code.
 COPY server ./
 
 RUN chown -R node:node /app/server
@@ -100,5 +99,4 @@ USER node
 
 EXPOSE 5000
 
-# Start the API directly with Node instead of `npm start`.
 CMD ["node", "index.js"]
