@@ -1,6 +1,6 @@
 resource "aws_instance" "bastion" {
   # checkov:skip=CKV_AWS_88:The bastion is intentionally placed in a public subnet and requires a public IP to act as the controlled SSH jump host.
-  # checkov:skip=CKV2_AWS_41:The bastion does not call AWS APIs, so attaching an IAM role would provide unnecessary permissions.
+  # checkov:skip=CKV2_AWS_41:The bastion does not call AWS APIs, so attaching an IAM role would introduce unnecessary permissions.
 
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
@@ -9,10 +9,13 @@ resource "aws_instance" "bastion" {
   associate_public_ip_address = true
   vpc_security_group_ids      = [aws_security_group.bastion.id]
 
-  # Enable detailed EC2 monitoring to improve operational visibility.
+  # Improve EBS performance and satisfy the EC2 security baseline.
+  ebs_optimized = true
+
+  # Enable detailed EC2 monitoring.
   monitoring = true
 
-  # Require IMDSv2 to protect instance metadata.
+  # Require IMDSv2 to protect EC2 instance metadata.
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -40,10 +43,12 @@ resource "aws_instance" "application" {
   vpc_security_group_ids      = [aws_security_group.application.id]
   iam_instance_profile        = aws_iam_instance_profile.application.name
 
-  # Enable detailed EC2 monitoring for operational visibility.
+  # Improve EBS performance and satisfy the EC2 security baseline.
+  ebs_optimized = true
+
+  # Enable detailed EC2 monitoring.
   monitoring = true
 
-  # Require IMDSv2 and restrict metadata response forwarding.
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
