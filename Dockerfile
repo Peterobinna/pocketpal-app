@@ -1,96 +1,100 @@
 # =========================================================
-# PocketPal Dockerfile
+# PocketPal multi-stage production Dockerfile
 # =========================================================
-# This Dockerfile uses multiple stages:
 #
-# 1. frontend-build:
-#    Builds the React + TypeScript + Vite frontend.
+# Targets:
+#   frontend-run - serves the compiled React application
+#   backend-run  - runs the Express API
 #
-# 2. frontend-run:
-#    Serves the built frontend application.
-#
-# 3. backend-run:
-#    Runs the Express backend server.
-#
-# Docker Compose will later choose which target to build.
+# The final images contain only the components required
+# to run each service.
 # =========================================================
 
 
 # =========================================================
-# STAGE 1: Build the frontend
+# STAGE 1: BUILD FRONTEND
 # =========================================================
-# We use a specific Node version for consistency.
+
 FROM node:20-alpine AS frontend-build
 
-# Set working directory inside the container.
 WORKDIR /app
 
-# Copy frontend package files first.
-# This helps Docker cache dependency installation.
-COPY package*.json ./
+# Copy dependency manifests first to improve Docker caching.
+COPY package.json package-lock.json ./
 
-# Install frontend dependencies.
-RUN npm install
+# Use the committed lockfile for deterministic CI builds.
+RUN npm ci
 
-# Copy the rest of the frontend source code.
+# Copy the frontend source after dependency installation.
 COPY . .
 
-# Allow frontend API URL to be passed during Docker build.
-# If no value is passed, it defaults to localhost backend.
-# An empty value makes the frontend call /api through the same load balancer.
+# An empty API URL makes the frontend use relative /api routes
+# through the Application Load Balancer.
 ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build the production frontend files into the dist folder.
+# Compile the TypeScript and Vite production bundle.
 RUN npm run build
 
 
 # =========================================================
-# STAGE 2: Run the frontend
+# STAGE 2: RUN FRONTEND
 # =========================================================
+
 FROM node:20-alpine AS frontend-run
 
-# Set working directory.
 WORKDIR /app
 
-# Install a lightweight static server for serving Vite build files.
-RUN npm install -g serve
+# Upgrade the npm installation supplied by the base image.
+# npm 11.19.0 is compatible with Node 20 and uses a patched
+# node-tar dependency instead of the vulnerable tar 7.5.18.
+#
+# Pin serve to a known version so production builds remain
+# deterministic.
+RUN npm install --global npm@11.19.0 \
+    && npm install --global serve@14.2.6 \
+    && npm cache clean --force
 
-# Copy only the built frontend files from the previous stage.
+# Copy only the compiled frontend files.
 COPY --from=frontend-build /app/dist ./dist
 
-# Use the built-in non-root node user for better security.
+# The official Node image includes an unprivileged node user.
 USER node
 
-# Expose frontend port.
 EXPOSE 5173
 
-# Serve the frontend application.
 CMD ["serve", "-s", "dist", "-l", "5173"]
 
 
 # =========================================================
-# STAGE 3: Run the backend
+# STAGE 3: RUN BACKEND
 # =========================================================
+
 FROM node:20-alpine AS backend-run
 
-# Set backend working directory.
 WORKDIR /app/server
 
-# Copy backend package files first for better Docker caching.
-COPY server/package*.json ./
+# Upgrade npm in the backend runtime image as well. This prevents
+# the backend Trivy scan from finding the same vulnerable npm
+# node-tar package after the frontend scan passes.
+RUN npm install --global npm@11.19.0 \
+    && npm cache clean --force
 
-# Install only production dependencies for the backend.
-RUN npm install --omit=dev
+# Copy only the backend dependency manifests initially.
+COPY server/package.json server/package-lock.json ./
 
-# Copy backend source code.
+# Install only the production dependency tree recorded in the lockfile.
+RUN npm ci --omit=dev \
+    && npm cache clean --force
+
+# Copy the backend application code.
 COPY server ./
 
-# Use the built-in non-root node user for better security.
+# Ensure application files are readable by the unprivileged user.
+RUN chown -R node:node /app/server
+
 USER node
 
-# Expose backend port.
 EXPOSE 5000
 
-# Start the Express server.
 CMD ["npm", "start"]
