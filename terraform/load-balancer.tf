@@ -1,4 +1,9 @@
 resource "aws_lb" "main" {
+  # checkov:skip=CKV2_AWS_28:AWS WAF is outside the cost and scope of this coursework environment. Production must attach a managed WAF web ACL.
+  # checkov:skip=CKV_AWS_150:Deletion protection is disabled so the team can destroy billable coursework resources after grading. Production must enable it.
+  # checkov:skip=CKV_AWS_91:ALB access logging requires an additional S3 logging architecture and is omitted for this short-lived coursework environment. Production must enable centralized access logs.
+  # checkov:skip=CKV2_AWS_20:An HTTPS redirect requires a registered domain and ACM certificate. The coursework environment exposes HTTP only; production must redirect HTTP to HTTPS.
+
   name               = "${var.project_name}-${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
@@ -10,6 +15,7 @@ resource "aws_lb" "main" {
   ]
 
   drop_invalid_header_fields = true
+  enable_deletion_protection = false
 
   tags = {
     Name = "${local.resource_prefix}-alb"
@@ -17,6 +23,8 @@ resource "aws_lb" "main" {
 }
 
 resource "aws_lb_target_group" "frontend" {
+  # checkov:skip=CKV_AWS_378:Traffic between the ALB and the application instance remains inside the controlled VPC. Production should use end-to-end TLS where required.
+
   name        = "${var.project_name}-frontend-tg"
   port        = var.frontend_port
   protocol    = "HTTP"
@@ -36,6 +44,8 @@ resource "aws_lb_target_group" "frontend" {
 }
 
 resource "aws_lb_target_group" "backend" {
+  # checkov:skip=CKV_AWS_378:Traffic between the ALB and the application instance remains inside the controlled VPC. Production should use end-to-end TLS where required.
+
   name        = "${var.project_name}-backend-tg"
   port        = var.backend_port
   protocol    = "HTTP"
@@ -67,6 +77,10 @@ resource "aws_lb_target_group_attachment" "backend" {
 }
 
 resource "aws_lb_listener" "http" {
+  # checkov:skip=CKV_AWS_2:The coursework environment has no registered domain or ACM certificate. Production must use HTTPS.
+  # checkov:skip=CKV_AWS_103:The coursework environment has no registered domain or ACM certificate. Production must use TLS 1.2 or newer.
+
+
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"

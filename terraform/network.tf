@@ -1,10 +1,25 @@
 resource "aws_vpc" "main" {
+  # checkov:skip=CKV2_AWS_11:VPC Flow Logs incur ongoing CloudWatch ingestion and storage costs and are omitted from this short-lived coursework environment. Production must enable centralized flow logging.
+
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = {
     Name = "${local.resource_prefix}-vpc"
+  }
+}
+
+# Explicitly restrict the default VPC security group.
+# Every application resource uses its own purpose-specific security group.
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+
+  ingress = []
+  egress  = []
+
+  tags = {
+    Name = "${local.resource_prefix}-default-deny-sg"
   }
 }
 
@@ -17,10 +32,12 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public_1" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_1_cidr
-  availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnet_1_cidr
+  availability_zone = data.aws_availability_zones.available.names[0]
+
+  # Public IP assignment is controlled per EC2 instance.
+  map_public_ip_on_launch = false
 
   tags = {
     Name = "${local.resource_prefix}-public-1"
@@ -29,10 +46,12 @@ resource "aws_subnet" "public_1" {
 }
 
 resource "aws_subnet" "public_2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = var.public_subnet_2_cidr
-  availability_zone       = data.aws_availability_zones.available.names[1]
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = var.public_subnet_2_cidr
+  availability_zone = data.aws_availability_zones.available.names[1]
+
+  # The ALB does not require subnet-level automatic EC2 public IP assignment.
+  map_public_ip_on_launch = false
 
   tags = {
     Name = "${local.resource_prefix}-public-2"
@@ -99,8 +118,8 @@ resource "aws_route_table_association" "public_2" {
   route_table_id = aws_route_table.public.id
 }
 
-# The NAT Gateway allows the private EC2 instance to download packages
-# and pull ECR images without becoming publicly reachable.
+# The NAT Gateway allows the private application instance to download
+# packages and pull ECR images without receiving a public IP address.
 resource "aws_eip" "nat" {
   domain = "vpc"
 

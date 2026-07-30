@@ -6,8 +6,9 @@ resource "aws_ecr_repository" "frontend" {
     scan_on_push = true
   }
 
+  # Use the AWS-managed ECR KMS key.
   encryption_configuration {
-    encryption_type = "AES256"
+    encryption_type = "KMS"
   }
 
   tags = {
@@ -23,8 +24,9 @@ resource "aws_ecr_repository" "backend" {
     scan_on_push = true
   }
 
+  # Use the AWS-managed ECR KMS key.
   encryption_configuration {
-    encryption_type = "AES256"
+    encryption_type = "KMS"
   }
 
   tags = {

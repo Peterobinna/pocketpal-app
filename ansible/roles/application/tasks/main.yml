@@ -65,10 +65,14 @@
 
 - name: Show running PocketPal containers
   ansible.builtin.command:
-    cmd: docker ps --filter name=pocketpal --format "{{ '{{' }}.Names{{ '}}' }}: {{ '{{' }}.Status{{ '}}' }}"
+    argv:
+      - docker
+      - ps
+      - --filter
+      - name=pocketpal
   register: docker_ps
   changed_when: false
 
-- name: Display running containers
+- name: Display running PocketPal containers
   ansible.builtin.debug:
     var: docker_ps.stdout_lines
