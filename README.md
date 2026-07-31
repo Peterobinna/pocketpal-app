@@ -26,8 +26,6 @@ GET /api/goals             → Savings goals fetched successfully
 GET /api/transactions      → Transactions fetched successfully
 ```
 
-> 🔶 **TEMPLATE — confirm before submitting:** this URL points at an ALB with no ACM certificate (see SECURITY.md SEC-004), so it is HTTP only and the DNS/IP is not guaranteed stable across `terraform apply` runs. Re-verify the URL is still live immediately before your evaluator opens it, and re-run `Resolve-DnsName` / `Invoke-RestMethod "$LiveUrl/health"` if you rebuild the ALB.
-
 ---
 
 # Architecture
@@ -69,22 +67,22 @@ GET /api/transactions      → Transactions fetched successfully
 
 This reflects the real Terraform resource names in `terraform/security-groups.tf`, `outputs.tf`, and `SECURITY.md` (`aws_lb.main`, `aws_instance.bastion`, frontend/backend target groups), and the container layout confirmed via `docker ps` on the production host (`pocketpal-frontend`, `pocketpal-backend`, image tag `manual-20260731002208`).
 
-> 🔶 **TEMPLATE:** if you have an actual diagramming tool export (draw.io, Lucidchart, `terraform graph`), swap this ASCII version for that image and link it here instead.
-
 ---
 
 # Team Members
 
-| Team Member      | Role                                   |
-| ---------------- | -------------------------------------- |
+| Team Member   | Role                                   |
+| ------------- | -------------------------------------- |
 | Peter Nnamchukwu | Team Lead / Repository & Documentation |
-| Olivier Ishimwe  | Frontend Developer                     |
-| Sarah Kasande    | Backend Developer                      |
-| Sibahle Dlamini  | DevOps & QA                            |
+| Olivier Ishimwe | Frontend Developer                     |
+| Sarah Kasande | Backend Developer                      |
+| Sibahle Dlamini | DevOps & QA                            |
 
-## Team Tracker Sheet
+## Team Tracker Sheet 
 
 [BSE Team Task Sheet - Advanced DevOps](https://docs.google.com/spreadsheets/d/1Zg4m-Mq2uBONXfw4mRRhndXJrH9SZFlJd-Z36j7nMSE/edit?usp=sharing)
+
+
 
 ---
 
@@ -137,8 +135,6 @@ PocketPal provides a simple, lightweight budgeting tool designed specifically fo
 - Nginx (production container web server, hardened/unprivileged)
 
   Confirmed via the repo: PR #62 (merged 2026-07-30) includes commit [`527559e` — "fix: serve frontend with hardened unprivileged Nginx"](https://github.com/Peterobinna/pocketpal-app/pull/62/commits/527559e094493c05e1667a8c3ff6bed2bcf4722d), which adds a new `nginx.conf` and updates the `Dockerfile`. This matches the production evidence: the deployed `pocketpal-frontend` container exposes port 8080 in addition to 5173 (see `docker ps` output in `EVIDENCE.MD`), consistent with an Nginx listener alongside the original Vite/`serve` port.
-  > 🔶 Note: this change is merged into the `summative-integration` branch (the one actually deployed to production), not yet into `main` — the `Dockerfile` on `main` at time of writing still uses the original `serve`-based frontend-run stage with a plain `USER node` non-root directive. If you want the exact `nginx.conf` contents (worker user, listen port, etc.) documented here, point me at the `summative-integration` branch and I'll pull it.
-
 ## Backend
 
 - Node.js
@@ -420,12 +416,6 @@ Tasks are assigned to individual team members with labels for:
 - Security
 - Testing
 
-GitHub Project Board:
-
-```
-🔶 TEMPLATE — paste your actual GitHub Project Board link here. Not provided in any upload, so it can't be filled in for you.
-```
-
 ---
 
 # Current Working Features
@@ -442,6 +432,7 @@ The current version of PocketPal supports:
 - Express REST API
 - GitHub collaboration workflow
 - Live production deployment on AWS (EC2 + ALB), verified reachable and healthy
+
 
 ---
 
@@ -463,8 +454,6 @@ Future versions of PocketPal may include:
 
 # Rollback Instructions
 
-> 🔶 **No dedicated rollback script or documented rollback run exists in the repo as of PR #62.** But the real `cd.yml` pipeline (confirmed above) does give you what you need to build one — the steps below use its actual tagging scheme, not a generic guess.
-
 **Two image tagging schemes are in play, and it matters which one you're rolling back from:**
 - The automated `cd.yml` pipeline tags images by commit SHA: `${{ github.sha }}` — e.g. an image built from commit `527559e` would be tagged `527559e...` (the full SHA) in ECR.
 - The production host you validated on 2026-07-31 is running images tagged `manual-20260731002208` — a manual/ad-hoc tag, not one the `cd.yml` pipeline produces. This suggests that deployment was done by hand (or by a script outside `cd.yml`), not through the automated pipeline itself.
@@ -483,8 +472,6 @@ Future versions of PocketPal may include:
    docker ps   # on the production host, confirm the older image tag is running
    ```
 5. If the rollback itself fails, restore from the most recent `terraform.tfstate.backup` and re-provision rather than patching a broken host in place.
-
-🔶 If your team wants this as an actual reusable script (not just documented steps), that's a real gap — `cd.yml` has no rollback job today. Worth raising as a genuine follow-up item rather than writing one in speculatively here.
 
 ---
 
