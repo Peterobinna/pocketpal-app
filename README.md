@@ -26,6 +26,14 @@ GET /api/goals             → Savings goals fetched successfully
 GET /api/transactions      → Transactions fetched successfully
 ```
 
+
+---
+
+## Live Application URL: http://pocketpal-dev-alb-1527388168.us-east-1.elb.amazonaws.com/
+## YouTube Demo Video Link: https://youtu.be/Y3MYGA3oKoc
+## PR URL: https://github.com/Peterobinna/pocketpal-app/pull/64
+
+
 ---
 
 # Architecture
