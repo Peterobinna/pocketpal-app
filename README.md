@@ -75,6 +75,7 @@ This reflects the real Terraform resource names in `terraform/security-groups.tf
 | Olivier Ishimwe | Frontend Developer                     |
 | Sarah Kasande | Backend Developer                      |
 | Sibahle Dlamini | DevOps & QA                            |
+| Ewing | Security Scanner                           |
 
 ## Team Tracker Sheet 
 
