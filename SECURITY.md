@@ -17,9 +17,7 @@ This review covers:
 | Dependency scanning | npm audit | Frontend and backend dependencies | Every pull request |
 | Container scanning  | Trivy     | PocketPal Docker images           | Every pull request — HIGH/CRITICAL findings block the build (`exit-code: "1"`, `ignore-unfixed: true`) |
 | IaC scanning        | Checkov   | terraform/                        | Every pull request, enforced (`soft_fail: false`) |
-| TLS/library scanning | OpenSSL  | Container base images             | 🔶 See note below   |
 
-> 🔶 **TEMPLATE — OpenSSL row added per request, but no OpenSSL scan output exists anywhere in the repo.** None of the workflow files (`ci.yml`, `cd.yml`), npm audit, Trivy, or Checkov output reference OpenSSL specifically, and no separate OpenSSL version/CVE check appears in any file pulled from GitHub. If your base images use Alpine/Debian, check the OpenSSL version baked into your `pocketpal-frontend`/`pocketpal-backend` images (`docker exec <container> openssl version`) and note any known CVEs for that version here. Until that's run and pasted in, treat this row as a placeholder, not a completed check.
 
 ## Findings summary
 
@@ -41,7 +39,7 @@ This review covers:
 
 Checkov overall result (application infrastructure, run referenced in `EVIDENCE.MD`, tested 2026-07-21): **34 passed, 6 failed** (SEC-009 through SEC-012 above).
 
-**On SEC-007–SEC-012:** PR #62 (merged 2026-07-30, [run #46 passed 2/2 checks](https://github.com/Peterobinna/pocketpal-app/actions/runs/30507646105)) includes commits `0265b85` ("fix: patch npm vulnerabilities in runtime images"), `8f240db` ("fix: remove vulnerable npm tooling from runtime images"), and `1da4f10` ("fix: remediate and document Checkov infrastructure findings"). The npm audit fixes are confirmed resolved because the CI job that runs `npm audit --audit-level=high` for both frontend and backend now passes. The exact post-fix Checkov pass/fail counts for SEC-009–012 weren't pulled from the PR diff itself — 🔶 if you want the precise before/after numbers, share the Checkov step's log output from run #46 and I'll fill in the exact counts instead of "addressed."
+**On SEC-007–SEC-012:** PR #62 (merged 2026-07-30, [run #46 passed 2/2 checks](https://github.com/Peterobinna/pocketpal-app/actions/runs/30507646105)) includes commits `0265b85` ("fix: patch npm vulnerabilities in runtime images"), `8f240db` ("fix: remove vulnerable npm tooling from runtime images"), and `1da4f10` ("fix: remediate and document Checkov infrastructure findings"). The npm audit fixes are confirmed resolved because the CI job that runs `npm audit --audit-level=high` for both frontend and backend now passes. The exact post-fix Checkov pass/fail counts for SEC-009–012 weren't pulled from the PR diff itself.
 
 ## Detailed findings
 
@@ -76,7 +74,7 @@ Checkov overall result (application infrastructure, run referenced in `EVIDENCE.
 **Update (PR #61, 2026-07-29):** The team pinned `aquasecurity/trivy-action@0.28.0`, a version that doesn't exist, so CI [run #38](https://github.com/Peterobinna/pocketpal-app/actions/runs/30484145267) failed immediately in the "Application Quality and Container Security" job before Trivy could even run.
 **Remediation:** PR #62 bumps the pin to `aquasecurity/trivy-action@v0.36.0` in both `ci.yml` and the new `cd.yml`. Both workflows scan the frontend and backend images with `severity: HIGH,CRITICAL`, `ignore-unfixed: true`, and `exit-code: "1"` — meaning a HIGH/CRITICAL finding with a fix available blocks the build/deploy.
 **Validation:** [Run #46](https://github.com/Peterobinna/pocketpal-app/actions/runs/30507646105) (2026-07-30) — "Application Quality and Container Security" passed in 1m13s, which includes the Trivy scan step against both images.
-**Status:** Resolved — Trivy now runs and gates every PR and every production deployment. (The underlying per-CVE Trivy report itself wasn't pulled from the run logs — 🔶 share that step's log if you want the specific package/CVE list included here.)
+**Status:** Resolved — Trivy now runs and gates every PR and every production deployment. (The underlying per-CVE Trivy report itself wasn't pulled from the run logs).
 
 ## Accepted risks
 
