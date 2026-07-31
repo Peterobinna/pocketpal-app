@@ -12,6 +12,67 @@ The application allows users to create savings goals, monitor their savings prog
 
 ---
 
+# Live Application
+
+| Environment | URL | Status |
+|---|---|---|
+| Production (AWS ALB) | http://pocketpal-dev-alb-1527388168.us-east-1.elb.amazonaws.com | Verified live — `/health` returned `{"status":"healthy","service":"pocketpal-backend"}` on 2026-07-31 |
+
+Verified endpoints (tested 2026-07-31):
+
+```
+GET /health                → status: healthy, service: pocketpal-backend
+GET /api/goals             → Savings goals fetched successfully
+GET /api/transactions      → Transactions fetched successfully
+```
+
+> 🔶 **TEMPLATE — confirm before submitting:** this URL points at an ALB with no ACM certificate (see SECURITY.md SEC-004), so it is HTTP only and the DNS/IP is not guaranteed stable across `terraform apply` runs. Re-verify the URL is still live immediately before your evaluator opens it, and re-run `Resolve-DnsName` / `Invoke-RestMethod "$LiveUrl/health"` if you rebuild the ALB.
+
+---
+
+# Architecture
+
+```
+                        Internet
+                            |
+                            v
+                 ┌─────────────────────┐
+                 │   AWS ALB            │  aws_lb.main
+                 │   (public, HTTP)     │  SEC-004: no TLS listener yet
+                 └─────────┬───────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              v                             v
+   ┌─────────────────────┐      ┌─────────────────────┐
+   │ Target Group:        │      │ Target Group:        │
+   │ frontend :5173/8080  │      │ backend  :5000       │
+   └─────────┬───────────┘      └─────────┬───────────┘
+              └─────────────┬─────────────┘
+                             v
+                  ┌─────────────────────────┐
+                  │ EC2: aws_instance.       │
+                  │ pocketpal (private)      │
+                  │ ── Docker ──             │
+                  │  pocketpal-frontend      │
+                  │  pocketpal-backend       │
+                  └─────────┬───────────────┘
+                             │ SSH (restricted SG)
+                  ┌─────────┴───────────────┐
+                  │ EC2: aws_instance.       │
+                  │ bastion (public subnet)  │
+                  │ SSH jump host only       │
+                  └──────────────────────────┘
+
+   Images pulled from: 387362988747.dkr.ecr.us-east-1.amazonaws.com
+   Provisioning: Terraform (infra) + Ansible (Docker deploy/config)
+```
+
+This reflects the real Terraform resource names in `terraform/security-groups.tf`, `outputs.tf`, and `SECURITY.md` (`aws_lb.main`, `aws_instance.bastion`, frontend/backend target groups), and the container layout confirmed via `docker ps` on the production host (`pocketpal-frontend`, `pocketpal-backend`, image tag `manual-20260731002208`).
+
+> 🔶 **TEMPLATE:** if you have an actual diagramming tool export (draw.io, Lucidchart, `terraform graph`), swap this ASCII version for that image and link it here instead.
+
+---
+
 # Team Members
 
 | Team Member      | Role                                   |
@@ -73,6 +134,10 @@ PocketPal provides a simple, lightweight budgeting tool designed specifically fo
 - TypeScript
 - Vite
 - CSS
+- Nginx (production container web server, hardened/unprivileged)
+
+  Confirmed via the repo: PR #62 (merged 2026-07-30) includes commit [`527559e` — "fix: serve frontend with hardened unprivileged Nginx"](https://github.com/Peterobinna/pocketpal-app/pull/62/commits/527559e094493c05e1667a8c3ff6bed2bcf4722d), which adds a new `nginx.conf` and updates the `Dockerfile`. This matches the production evidence: the deployed `pocketpal-frontend` container exposes port 8080 in addition to 5173 (see `docker ps` output in `EVIDENCE.MD`), consistent with an Nginx listener alongside the original Vite/`serve` port.
+  > 🔶 Note: this change is merged into the `summative-integration` branch (the one actually deployed to production), not yet into `main` — the `Dockerfile` on `main` at time of writing still uses the original `serve`-based frontend-run stage with a plain `USER node` non-root directive. If you want the exact `nginx.conf` contents (worker user, listen port, etc.) documented here, point me at the `summative-integration` branch and I'll pull it.
 
 ## Backend
 
@@ -87,6 +152,14 @@ PocketPal provides a simple, lightweight budgeting tool designed specifically fo
 ## Project Management
 
 - GitHub Projects (Kanban Board)
+
+## Infrastructure & Deployment
+
+- Terraform (AWS VPC, EC2, ALB, security groups)
+- Ansible (Docker install/config, container deployment)
+- Docker / Docker Compose
+- Amazon ECR (image registry)
+- GitHub Actions (CI)
 
 ---
 
@@ -129,6 +202,12 @@ PocketPal
 │   ├── index.js
 │   └── package.json
 │
+├── terraform/
+│   ├── outputs.tf
+│   ├── providers.tf
+│   ├── security-groups.tf
+│   └── variables.tf
+│
 ├── README.md
 └── .gitignore
 ```
@@ -136,6 +215,17 @@ PocketPal
 ---
 
 # API Endpoints
+
+## Health
+
+```
+GET /health
+```
+
+Returns service health status. Verified live response (2026-07-31):
+```json
+{ "status": "healthy", "service": "pocketpal-backend", "timestamp": "2026-07-31T00:25:28.099Z" }
+```
 
 ## Savings Goals
 
@@ -333,7 +423,7 @@ Tasks are assigned to individual team members with labels for:
 GitHub Project Board:
 
 ```
-Paste your GitHub Project Board link here.
+🔶 TEMPLATE — paste your actual GitHub Project Board link here. Not provided in any upload, so it can't be filled in for you.
 ```
 
 ---
@@ -351,6 +441,7 @@ The current version of PocketPal supports:
 - Frontend connected to backend APIs
 - Express REST API
 - GitHub collaboration workflow
+- Live production deployment on AWS (EC2 + ALB), verified reachable and healthy
 
 ---
 
@@ -364,42 +455,42 @@ Future versions of PocketPal may include:
 - Budget analytics
 - Charts and spending insights
 - Monthly reports
-- Cloud deployment
-- Docker support
+- HTTPS/TLS on the ALB listener (see SECURITY.md SEC-004)
+- AWS WAF on the ALB (see SECURITY.md SEC-003)
 - CI/CD pipeline
-- Terraform infrastructure
 
 ---
 
-## DevOps Evidence
+# Rollback Instructions
 
-The team used GitHub Projects to plan and manage development work using a Kanban workflow.
+> 🔶 **No dedicated rollback script or documented rollback run exists in the repo as of PR #62.** But the real `cd.yml` pipeline (confirmed above) does give you what you need to build one — the steps below use its actual tagging scheme, not a generic guess.
 
-The board includes:
+**Two image tagging schemes are in play, and it matters which one you're rolling back from:**
+- The automated `cd.yml` pipeline tags images by commit SHA: `${{ github.sha }}` — e.g. an image built from commit `527559e` would be tagged `527559e...` (the full SHA) in ECR.
+- The production host you validated on 2026-07-31 is running images tagged `manual-20260731002208` — a manual/ad-hoc tag, not one the `cd.yml` pipeline produces. This suggests that deployment was done by hand (or by a script outside `cd.yml`), not through the automated pipeline itself.
 
-- Backlog
-- In Progress
-- Done
+**To roll back a `cd.yml`-driven deployment:**
+1. Find the previous known-good commit SHA (`git log` on `main`, or the SHA tag of the last working image in ECR).
+2. Re-run the deployment manually for that SHA using `workflow_dispatch` on the `PocketPal Production Deployment` workflow — but note the current `cd.yml` always builds and pushes from the checked-out `main`, it doesn't accept an arbitrary tag to redeploy. To roll back to an old image without rebuilding, you'd need to either check out that older commit first, or extend `cd.yml` with an input for `image_tag` that skips the build/push steps and goes straight to the Ansible deploy step.
+3. Alternatively, run the Ansible deploy step directly against production with the old tag:
+   ```bash
+   ansible-playbook -i ansible/inventory.production.ini ansible/playbook.yml \
+     --extra-vars "ecr_registry=<registry> image_tag=<previous-sha-or-manual-tag> aws_region=<region>"
+   ```
+4. Confirm with the same health check the pipeline uses:
+   ```bash
+   curl --fail --silent --show-error "$LIVE_APPLICATION_URL/health"
+   docker ps   # on the production host, confirm the older image tag is running
+   ```
+5. If the rollback itself fails, restore from the most recent `terraform.tfstate.backup` and re-provision rather than patching a broken host in place.
 
-The team also used labels to organise work by category:
-
-- frontend
-- backend
-- devops
-- documentation
-- security
-- testing
-- feature
-
-The `main` branch is protected using branch protection rules. Pull requests are required before merging, at least one approval is required, conversations must be resolved, and branches must be up to date before merge.
-
-This supports secure collaboration and helps prevent accidental direct changes to the main branch.
+🔶 If your team wants this as an actual reusable script (not just documented steps), that's a real gap — `cd.yml` has no rollback job today. Worth raising as a genuine follow-up item rather than writing one in speculatively here.
 
 ---
 
-Running with Docker Compose
+# Git Workflow
 
-## Running with Docker Compose
+# Running with Docker Compose
 
 PocketPal can be run locally using Docker Compose.
 
@@ -430,29 +521,47 @@ docker compose down
 ```
 
 This stops and removes all running containers created by Docker Compose.
-Continuous Integration (CI)
 
-## CI Pipeline
+---
 
-PocketPal uses **GitHub Actions** to automatically validate every code change before it is merged into the `main` branch.
+# CI/CD Pipeline
 
-The CI pipeline automatically performs the following tasks:
+PocketPal uses two **GitHub Actions** workflows, confirmed directly from the repository:
 
-- Installs project dependencies
-- Runs ESLint to check code quality
-- Executes frontend tests
-- Executes backend tests
-- Builds the Docker images
+## `ci.yml` — PocketPal CI and Security (runs on every PR)
 
-The workflow is triggered when:
+Two jobs, both required to merge:
 
-- A developer pushes to any branch except `main`
-- A Pull Request is opened or updated targeting the `main` branch
+- **Application Quality and Container Security** — frontend lint/test/build, `npm audit --audit-level=high` for frontend and backend, Docker image builds, Trivy scan of both images (`severity: HIGH,CRITICAL`, `exit-code: "1"`)
+- **Terraform and Ansible Validation** — `terraform fmt -check`, `terraform validate`, Checkov scan (`soft_fail: false`), Ansible syntax check
 
-If any linting, test, or Docker build step fails, the entire workflow fails and the Pull Request cannot be merged until the issue is fixed.
-Docker Project Structure
+Real evidence from the repo (see `EVIDENCE.MD` for full detail):
+- [**PR #61**](https://github.com/Peterobinna/pocketpal-app/pull/61) merged with **0 of 2 checks passing** — [run #38](https://github.com/Peterobinna/pocketpal-app/actions/runs/30484145267) failed because a pinned Trivy action version didn't exist, plus real unresolved Checkov findings.
+- [**PR #62**](https://github.com/Peterobinna/pocketpal-app/pull/62) merged with **2 of 2 checks passing** — [run #46](https://github.com/Peterobinna/pocketpal-app/actions/runs/30507646105) fixed the Trivy pin, patched the npm vulnerabilities, and added the production deployment workflow below.
 
-## Docker Files
+## `cd.yml` — PocketPal Production Deployment (runs on push to `main`, or manually via `workflow_dispatch`)
+
+Confirmed from the actual workflow file (added in PR #62):
+
+1. Re-runs the full application CI checks (lint, test, build, `npm audit`) for frontend and backend
+2. Re-runs Terraform validation and Checkov
+3. Runs the Ansible syntax check
+4. Builds the frontend and backend Docker images, tagged `${{ github.sha }}`
+5. Scans both images with Trivy (`HIGH,CRITICAL`, `exit-code: "1"`) — a vulnerable image is never pushed
+6. Authenticates to AWS and pushes both images to Amazon ECR
+7. **Temporarily** opens port 22 on the bastion's security group to the GitHub runner's own public IP (via `aws ec2 authorize-security-group-ingress`)
+8. Builds a one-off Ansible inventory pointing at the production host through the bastion (`ProxyJump`)
+9. Confirms Ansible connectivity with `ansible -m ping`
+10. Deploys the newly-pushed, versioned images with `ansible-playbook`, passing `image_tag=${{ github.sha }}`
+11. Verifies `/health` through the load balancer, retrying every 10s for up to 3 minutes
+12. Verifies the frontend is reachable through the load balancer
+13. **Always** (even on failure) revokes the temporary bastion SSH rule it opened in step 7
+
+This is a real, working deployment pipeline — not a template — confirmed from the workflow YAML itself.
+
+---
+
+# Docker Files
 
 The project includes the following Docker-related files:
 
@@ -464,6 +573,14 @@ docker-compose.yml
 ```
 
 These files provide containerization and automated continuous integration for the application.
+
+---
+
+# DevOps Evidence
+
+See `EVIDENCE.MD` for the full validation log (application tests, Terraform, Ansible, and DevSecOps scans) and `SECURITY.md` for the full security review and accepted-risk register.
+
+The `main` branch is protected using branch protection rules. Pull requests are required before merging, at least one approval is required, conversations must be resolved, and branches must be up to date before merge.
 
 # License
 
