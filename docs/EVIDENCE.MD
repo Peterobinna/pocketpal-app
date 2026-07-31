@@ -98,7 +98,3 @@ This confirms the CI pipeline genuinely caught two independent real problems —
 - Job "Terraform and Ansible Validation" — passed in 1m9s
 - Fix for the PR #61 failure: commits `0265b85`/`8f240db` and a `ci.yml` diff that bumps `aquasecurity/trivy-action@0.28.0` → `aquasecurity/trivy-action@v0.36.0`
 - Also adds `.github/workflows/cd.yml`, a full production deployment workflow (see `README.md`), and commit `527559e` ("fix: serve frontend with hardened unprivileged Nginx") which adds `nginx.conf` and updates the `Dockerfile`
-
-### Note on "Ewing"
-
-No contributor named Ewing appears anywhere in this repository's commit history, pull requests, or Actions runs. The real contributors visible in the data pulled from GitHub are **Peterobinna** (repo owner), **SibahleD**, **IshimweOlivier-20**, **Sarah-kasande**, and reviewer **Zoulou1**. If "Ewing" refers to one of these people under a different name, let me know which one and I'll attribute their specific commits correctly instead.
