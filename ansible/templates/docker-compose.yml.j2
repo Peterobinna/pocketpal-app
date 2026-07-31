@@ -1,0 +1,32 @@
+services:
+  backend:
+    image: "{{ ecr_registry }}/pocketpal-backend:{{ image_tag }}"
+    container_name: pocketpal-backend
+    ports:
+      - "{{ backend_port }}:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://127.0.0.1:5000/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    image: "{{ ecr_registry }}/pocketpal-frontend:{{ image_tag }}"
+    container_name: pocketpal-frontend
+    ports:
+      - "{{ frontend_port }}:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

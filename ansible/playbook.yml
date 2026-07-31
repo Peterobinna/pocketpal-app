@@ -1,9 +1,9 @@
 ---
-- name: Configure PocketPal Server
+- name: Configure and deploy PocketPal production server
   hosts: web
   become: true
 
   roles:
     - docker
-    - application
     - security
+    - application

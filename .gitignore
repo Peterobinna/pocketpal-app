@@ -42,6 +42,10 @@ crash.*.log
 *.pem
 *.ppk
 
+# Generated Ansible inventory and temporary SSH material
+ansible/inventory.ini
+ansible/*.pem
+
 # Terraform working directories and saved plans
 **/.terraform/
 tfplan

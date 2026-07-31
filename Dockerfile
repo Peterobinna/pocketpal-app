@@ -1,95 +1,102 @@
 # =========================================================
-# PocketPal Dockerfile
+# PocketPal multi-stage production Dockerfile
 # =========================================================
-# This Dockerfile uses multiple stages:
 #
-# 1. frontend-build:
-#    Builds the React + TypeScript + Vite frontend.
+# Targets:
+#   frontend-run - serves compiled React files with Nginx
+#   backend-run  - runs the Express API with Node.js
 #
-# 2. frontend-run:
-#    Serves the built frontend application.
-#
-# 3. backend-run:
-#    Runs the Express backend server.
-#
-# Docker Compose will later choose which target to build.
+# The frontend runtime contains no Node.js, npm or serve package.
+# This reduces image size and removes unnecessary dependencies.
 # =========================================================
 
 
 # =========================================================
-# STAGE 1: Build the frontend
+# STAGE 1: BUILD FRONTEND
 # =========================================================
-# We use a specific Node version for consistency.
+
 FROM node:20-alpine AS frontend-build
 
-# Set working directory inside the container.
 WORKDIR /app
 
-# Copy frontend package files first.
-# This helps Docker cache dependency installation.
-COPY package*.json ./
+# Copy dependency manifests first for deterministic installation
+# and efficient Docker layer caching.
+COPY package.json package-lock.json ./
 
-# Install frontend dependencies.
-RUN npm install
+RUN npm ci
 
-# Copy the rest of the frontend source code.
+# Copy the application source after dependencies are installed.
 COPY . .
 
-# Allow frontend API URL to be passed during Docker build.
-# If no value is passed, it defaults to localhost backend.
-ARG VITE_API_URL=http://localhost:5000
+# An empty value makes the frontend call relative /api routes
+# through the AWS Application Load Balancer.
+ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 
-# Build the production frontend files into the dist folder.
 RUN npm run build
 
 
 # =========================================================
-# STAGE 2: Run the frontend
+# STAGE 2: RUN FRONTEND WITH UNPRIVILEGED NGINX
 # =========================================================
-FROM node:20-alpine AS frontend-run
 
-# Set working directory.
-WORKDIR /app
+FROM nginxinc/nginx-unprivileged:alpine AS frontend-run
 
-# Install a lightweight static server for serving Vite build files.
-RUN npm install -g serve
+# Temporarily become root only while applying operating-system
+# security patches and preparing configuration files.
+USER root
 
-# Copy only the built frontend files from the previous stage.
-COPY --from=frontend-build /app/dist ./dist
+# Upgrade Alpine packages to patched versions, including
+# libcrypto3 and libssl3.
+RUN apk upgrade --no-cache
 
-# Use the built-in non-root node user for better security.
-USER node
+# Remove the default Nginx virtual-host configuration.
+RUN rm -f /etc/nginx/conf.d/default.conf
 
-# Expose frontend port.
+# Install the PocketPal Nginx configuration.
+COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/pocketpal.conf
+
+# Copy only compiled static frontend files.
+COPY --from=frontend-build --chown=101:101 /app/dist /usr/share/nginx/html
+
+# Return to the image's unprivileged Nginx user.
+USER 101
+
 EXPOSE 5173
 
-# Serve the frontend application.
-CMD ["serve", "-s", "dist", "-l", "5173"]
+CMD ["nginx", "-g", "daemon off;"]
 
 
 # =========================================================
-# STAGE 3: Run the backend
+# STAGE 3: RUN BACKEND
 # =========================================================
+
 FROM node:20-alpine AS backend-run
 
-# Set backend working directory.
 WORKDIR /app/server
 
-# Copy backend package files first for better Docker caching.
-COPY server/package*.json ./
+# Apply current Alpine security patches, including patched
+# OpenSSL packages.
+RUN apk upgrade --no-cache
 
-# Install only production dependencies for the backend.
-RUN npm install --omit=dev
+# Copy dependency manifests before source files.
+COPY server/package.json server/package-lock.json ./
 
-# Copy backend source code.
+# Install production dependencies only. npm is removed afterward
+# because the backend starts directly with Node.js.
+RUN npm ci --omit=dev \
+    && npm cache clean --force \
+    && rm -rf /root/.npm \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm \
+    && rm -f /usr/local/bin/npx
+
 COPY server ./
 
-# Use the built-in non-root node user for better security.
+RUN chown -R node:node /app/server
+
 USER node
 
-# Expose backend port.
 EXPOSE 5000
 
-# Start the Express server.
-CMD ["npm", "start"]
+CMD ["node", "index.js"]

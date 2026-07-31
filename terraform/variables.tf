@@ -1,8 +1,7 @@
-# AWS region in which the infrastructure will be created.
-# This has no default so that the region must be supplied explicitly.
 variable "aws_region" {
-  description = "AWS region in which to deploy the PocketPal infrastructure"
+  description = "AWS region used for the PocketPal production deployment"
   type        = string
+  default     = "us-east-1"
 
   validation {
     condition     = length(trimspace(var.aws_region)) > 0
@@ -10,9 +9,8 @@ variable "aws_region" {
   }
 }
 
-# Project name used when naming and tagging AWS resources.
 variable "project_name" {
-  description = "Project name used for AWS resource names and tags"
+  description = "Project name used in resource names and tags"
   type        = string
   default     = "pocketpal"
 
@@ -22,11 +20,10 @@ variable "project_name" {
   }
 }
 
-# Identifies the deployment environment.
 variable "environment" {
-  description = "Deployment environment, such as dev, staging or production"
+  description = "Deployment environment"
   type        = string
-  default     = "dev"
+  default     = "production"
 
   validation {
     condition     = contains(["dev", "staging", "production"], var.environment)
@@ -34,7 +31,6 @@ variable "environment" {
   }
 }
 
-# Private address range allocated to the VPC.
 variable "vpc_cidr" {
   description = "IPv4 CIDR block allocated to the PocketPal VPC"
   type        = string
@@ -46,21 +42,63 @@ variable "vpc_cidr" {
   }
 }
 
-# Address range allocated to the public subnet.
-variable "public_subnet_cidr" {
-  description = "IPv4 CIDR block allocated to the public subnet"
+variable "public_subnet_1_cidr" {
+  description = "CIDR block allocated to the first public subnet"
   type        = string
   default     = "10.0.1.0/24"
 
   validation {
-    condition     = can(cidrnetmask(var.public_subnet_cidr))
-    error_message = "public_subnet_cidr must be a valid IPv4 CIDR block."
+    condition     = can(cidrnetmask(var.public_subnet_1_cidr))
+    error_message = "public_subnet_1_cidr must be a valid IPv4 CIDR block."
   }
 }
 
-# EC2 instance size.
+variable "public_subnet_2_cidr" {
+  description = "CIDR block allocated to the second public subnet"
+  type        = string
+  default     = "10.0.2.0/24"
+
+  validation {
+    condition     = can(cidrnetmask(var.public_subnet_2_cidr))
+    error_message = "public_subnet_2_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "application_subnet_cidr" {
+  description = "CIDR block allocated to the private application subnet"
+  type        = string
+  default     = "10.0.10.0/24"
+
+  validation {
+    condition     = can(cidrnetmask(var.application_subnet_cidr))
+    error_message = "application_subnet_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "database_subnet_1_cidr" {
+  description = "CIDR block allocated to the first private database subnet"
+  type        = string
+  default     = "10.0.20.0/24"
+
+  validation {
+    condition     = can(cidrnetmask(var.database_subnet_1_cidr))
+    error_message = "database_subnet_1_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "database_subnet_2_cidr" {
+  description = "CIDR block allocated to the second private database subnet"
+  type        = string
+  default     = "10.0.21.0/24"
+
+  validation {
+    condition     = can(cidrnetmask(var.database_subnet_2_cidr))
+    error_message = "database_subnet_2_cidr must be a valid IPv4 CIDR block."
+  }
+}
+
 variable "instance_type" {
-  description = "EC2 instance type used for the PocketPal server"
+  description = "EC2 instance type used by the bastion and application server"
   type        = string
   default     = "t3.micro"
 
@@ -70,11 +108,9 @@ variable "instance_type" {
   }
 }
 
-# Existing AWS EC2 key-pair name.
 variable "ssh_key_name" {
-  description = "Name of the existing AWS EC2 key pair used for SSH"
+  description = "Existing AWS EC2 key-pair name"
   type        = string
-  sensitive   = false
 
   validation {
     condition     = length(trimspace(var.ssh_key_name)) > 0
@@ -82,25 +118,28 @@ variable "ssh_key_name" {
   }
 }
 
-# Only this IPv4 address will be permitted to connect through SSH.
 variable "ssh_allowed_cidr" {
-  description = "Trusted IPv4 CIDR permitted to access SSH, normally one public IP ending in /32"
+  description = "Trusted public IPv4 CIDR permitted to reach the bastion"
   type        = string
 
   validation {
     condition     = can(cidrnetmask(var.ssh_allowed_cidr))
-    error_message = "ssh_allowed_cidr must be a valid IPv4 CIDR block, such as 203.0.113.10/32."
+    error_message = "ssh_allowed_cidr must be a valid IPv4 CIDR, such as 203.0.113.10/32."
   }
 
   validation {
     condition     = var.ssh_allowed_cidr != "0.0.0.0/0"
-    error_message = "SSH must not be open to the entire internet. Supply a trusted /32 CIDR."
+    error_message = "SSH must not be open to the entire internet."
+  }
+
+  validation {
+    condition     = can(regex("/32$", var.ssh_allowed_cidr))
+    error_message = "ssh_allowed_cidr must normally identify one trusted IPv4 address ending in /32."
   }
 }
 
-# Port used by the PocketPal frontend container.
 variable "frontend_port" {
-  description = "Public port used by the PocketPal frontend"
+  description = "Port used by the PocketPal frontend container"
   type        = number
   default     = 5173
 
@@ -110,9 +149,8 @@ variable "frontend_port" {
   }
 }
 
-# Port used by the PocketPal backend API container.
 variable "backend_port" {
-  description = "Public port used by the PocketPal backend API"
+  description = "Port used by the PocketPal backend container"
   type        = number
   default     = 5000
 
@@ -122,9 +160,8 @@ variable "backend_port" {
   }
 }
 
-# Size of the encrypted EC2 root disk.
 variable "root_volume_size" {
-  description = "Size of the EC2 root EBS volume in GiB"
+  description = "Encrypted EC2 root volume size in GiB"
   type        = number
   default     = 10
 
@@ -134,9 +171,46 @@ variable "root_volume_size" {
   }
 }
 
-# Optional additional tags for AWS resources.
+variable "db_name" {
+  description = "PostgreSQL database name"
+  type        = string
+  default     = "pocketpal"
+
+  validation {
+    condition     = can(regex("^[A-Za-z][A-Za-z0-9_]*$", var.db_name))
+    error_message = "db_name must begin with a letter and contain only letters, numbers and underscores."
+  }
+}
+
+variable "db_username" {
+  description = "PostgreSQL administrator username"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(trimspace(var.db_username)) >= 3
+    error_message = "db_username must contain at least three characters."
+  }
+}
+
+variable "db_password" {
+  description = "PostgreSQL administrator password"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.db_password) >= 16
+    error_message = "db_password must contain at least 16 characters."
+  }
+
+  validation {
+    condition     = can(regex("[A-Z]", var.db_password)) && can(regex("[a-z]", var.db_password)) && can(regex("[0-9]", var.db_password))
+    error_message = "db_password must contain uppercase letters, lowercase letters and numbers."
+  }
+}
+
 variable "additional_tags" {
-  description = "Additional tags to apply to AWS resources"
+  description = "Additional tags applied to AWS resources"
   type        = map(string)
   default     = {}
 }

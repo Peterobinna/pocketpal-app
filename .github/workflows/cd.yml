@@ -1,0 +1,318 @@
+name: PocketPal Production Deployment
+
+on:
+  # Production deployment happens only after code reaches main.
+  push:
+    branches:
+      - main
+
+  # Allows the team to rerun a deployment manually after this workflow
+  # has been merged into the default branch.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Prevent two production deployments from running simultaneously.
+  group: pocketpal-production
+  cancel-in-progress: false
+
+env:
+  FRONTEND_REPOSITORY: pocketpal-frontend
+  BACKEND_REPOSITORY: pocketpal-backend
+
+jobs:
+  validate-build-and-deploy:
+    name: Validate, Build, Push and Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------------------
+      # APPLICATION CI CHECKS
+      # ---------------------------------------------------------------
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Run frontend lint
+        run: npm run lint
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Build frontend application
+        run: npm run build
+
+      - name: Scan frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: server
+        run: npm test
+
+      - name: Scan backend dependencies
+        working-directory: server
+        run: npm audit --audit-level=high
+
+      # ---------------------------------------------------------------
+      # TERRAFORM AND ANSIBLE VALIDATION
+      # ---------------------------------------------------------------
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Check Terraform formatting
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: Initialise Terraform without remote backend
+        working-directory: terraform
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Scan Terraform with Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: false
+          output_format: cli
+          quiet: false
+
+      - name: Install Ansible and required collections
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Run Ansible syntax check
+        run: |
+          ansible-playbook \
+            --syntax-check \
+            -i ansible/inventory.ini.example \
+            ansible/playbook.yml
+
+      # ---------------------------------------------------------------
+      # BUILD PRODUCTION CONTAINER IMAGES
+      # ---------------------------------------------------------------
+
+      - name: Build frontend production image
+        run: |
+          docker build \
+            --target frontend-run \
+            --build-arg VITE_API_URL="" \
+            --tag pocketpal-frontend:${{ github.sha }} \
+            .
+
+      - name: Build backend production image
+        run: |
+          docker build \
+            --target backend-run \
+            --tag pocketpal-backend:${{ github.sha }} \
+            .
+
+      # The images must not be pushed when critical/high findings exist.
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: pocketpal-frontend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: pocketpal-backend:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # ---------------------------------------------------------------
+      # AWS AND ECR
+      # ---------------------------------------------------------------
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Tag and push frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker tag \
+            pocketpal-frontend:${{ github.sha }} \
+            "$ECR_REGISTRY/$FRONTEND_REPOSITORY:${{ github.sha }}"
+
+          docker push \
+            "$ECR_REGISTRY/$FRONTEND_REPOSITORY:${{ github.sha }}"
+
+      - name: Tag and push backend image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker tag \
+            pocketpal-backend:${{ github.sha }} \
+            "$ECR_REGISTRY/$BACKEND_REPOSITORY:${{ github.sha }}"
+
+          docker push \
+            "$ECR_REGISTRY/$BACKEND_REPOSITORY:${{ github.sha }}"
+
+      # ---------------------------------------------------------------
+      # TEMPORARY GITHUB RUNNER SSH ACCESS
+      # ---------------------------------------------------------------
+
+      - name: Temporarily allow runner to reach bastion
+        id: temporary-ssh
+        env:
+          BASTION_SECURITY_GROUP_ID: ${{ secrets.BASTION_SECURITY_GROUP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          RUNNER_IP="$(curl --fail --silent https://checkip.amazonaws.com | tr -d '\n')"
+          RUNNER_CIDR="${RUNNER_IP}/32"
+
+          if [ -z "$RUNNER_IP" ]; then
+            echo "Unable to determine GitHub runner public IP."
+            exit 1
+          fi
+
+          echo "Temporarily authorizing the GitHub runner."
+
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$BASTION_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "$RUNNER_CIDR" \
+            --region "$AWS_REGION"
+
+          echo "runner_cidr=$RUNNER_CIDR" >> "$GITHUB_OUTPUT"
+          echo "rule_added=true" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------
+      # ANSIBLE DEPLOYMENT THROUGH BASTION
+      # ---------------------------------------------------------------
+
+      - name: Prepare SSH private key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/pocketpal.pem"
+          chmod 600 "$HOME/.ssh/pocketpal.pem"
+
+      - name: Create production Ansible inventory
+        env:
+          BASTION_HOST: ${{ secrets.BASTION_HOST }}
+          APPLICATION_PRIVATE_IP: ${{ secrets.APPLICATION_PRIVATE_IP }}
+        run: |
+          cat > ansible/inventory.production.ini <<EOF
+          [web]
+          pocketpal-production ansible_host=${APPLICATION_PRIVATE_IP}
+
+          [web:vars]
+          ansible_user=ubuntu
+          ansible_ssh_private_key_file=${HOME}/.ssh/pocketpal.pem
+          ansible_ssh_common_args='-o ProxyJump=ubuntu@${BASTION_HOST} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+          EOF
+
+      - name: Test Ansible connectivity through bastion
+        run: |
+          ansible \
+            -i ansible/inventory.production.ini \
+            web \
+            -m ping
+
+      - name: Deploy versioned ECR images with Ansible
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          ansible-playbook \
+            -i ansible/inventory.production.ini \
+            ansible/playbook.yml \
+            --extra-vars "ecr_registry=$ECR_REGISTRY image_tag=${{ github.sha }} aws_region=$AWS_REGION"
+
+      # ---------------------------------------------------------------
+      # LIVE APPLICATION VERIFICATION
+      # ---------------------------------------------------------------
+
+      - name: Verify backend health through load balancer
+        env:
+          LIVE_APPLICATION_URL: ${{ secrets.LIVE_APPLICATION_URL }}
+        run: |
+          HEALTH_URL="${LIVE_APPLICATION_URL%/}/health"
+
+          for ATTEMPT in $(seq 1 18); do
+            echo "Health-check attempt $ATTEMPT of 18"
+
+            if curl --fail --silent --show-error "$HEALTH_URL"; then
+              echo
+              echo "Backend health check passed."
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "The production health endpoint did not become healthy."
+          exit 1
+
+      - name: Verify frontend through load balancer
+        env:
+          LIVE_APPLICATION_URL: ${{ secrets.LIVE_APPLICATION_URL }}
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            "${LIVE_APPLICATION_URL%/}/" \
+            > /dev/null
+
+          echo "PocketPal frontend is reachable."
+
+      # This must run even when deployment or verification fails.
+      - name: Remove temporary runner SSH access
+        if: always() && steps.temporary-ssh.outputs.rule_added == 'true'
+        env:
+          BASTION_SECURITY_GROUP_ID: ${{ secrets.BASTION_SECURITY_GROUP_ID }}
+          RUNNER_CIDR: ${{ steps.temporary-ssh.outputs.runner_cidr }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$BASTION_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 22 \
+            --cidr "$RUNNER_CIDR" \
+            --region "$AWS_REGION"
