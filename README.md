@@ -61,8 +61,6 @@ GET /api/transactions      → Transactions fetched successfully
                   │ SSH jump host only       │
                   └──────────────────────────┘
 
-   Images pulled from: 387362988747.dkr.ecr.us-east-1.amazonaws.com
-   Provisioning: Terraform (infra) + Ansible (Docker deploy/config)
 ```
 
 This reflects the real Terraform resource names in `terraform/security-groups.tf`, `outputs.tf`, and `SECURITY.md` (`aws_lb.main`, `aws_instance.bastion`, frontend/backend target groups), and the container layout confirmed via `docker ps` on the production host (`pocketpal-frontend`, `pocketpal-backend`, image tag `manual-20260731002208`).
@@ -449,29 +447,6 @@ Future versions of PocketPal may include:
 - HTTPS/TLS on the ALB listener (see SECURITY.md SEC-004)
 - AWS WAF on the ALB (see SECURITY.md SEC-003)
 - CI/CD pipeline
-
----
-
-# Rollback Instructions
-
-**Two image tagging schemes are in play, and it matters which one you're rolling back from:**
-- The automated `cd.yml` pipeline tags images by commit SHA: `${{ github.sha }}` — e.g. an image built from commit `527559e` would be tagged `527559e...` (the full SHA) in ECR.
-- The production host you validated on 2026-07-31 is running images tagged `manual-20260731002208` — a manual/ad-hoc tag, not one the `cd.yml` pipeline produces. This suggests that deployment was done by hand (or by a script outside `cd.yml`), not through the automated pipeline itself.
-
-**To roll back a `cd.yml`-driven deployment:**
-1. Find the previous known-good commit SHA (`git log` on `main`, or the SHA tag of the last working image in ECR).
-2. Re-run the deployment manually for that SHA using `workflow_dispatch` on the `PocketPal Production Deployment` workflow — but note the current `cd.yml` always builds and pushes from the checked-out `main`, it doesn't accept an arbitrary tag to redeploy. To roll back to an old image without rebuilding, you'd need to either check out that older commit first, or extend `cd.yml` with an input for `image_tag` that skips the build/push steps and goes straight to the Ansible deploy step.
-3. Alternatively, run the Ansible deploy step directly against production with the old tag:
-   ```bash
-   ansible-playbook -i ansible/inventory.production.ini ansible/playbook.yml \
-     --extra-vars "ecr_registry=<registry> image_tag=<previous-sha-or-manual-tag> aws_region=<region>"
-   ```
-4. Confirm with the same health check the pipeline uses:
-   ```bash
-   curl --fail --silent --show-error "$LIVE_APPLICATION_URL/health"
-   docker ps   # on the production host, confirm the older image tag is running
-   ```
-5. If the rollback itself fails, restore from the most recent `terraform.tfstate.backup` and re-provision rather than patching a broken host in place.
 
 ---
 
